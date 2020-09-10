@@ -202,33 +202,32 @@ void execute_cmdgrp(char *cmdgrp)
 	int i=0;
 	int count = 0;
 	int pfd[2];
-    sigset_t set;
+	sigset_t set;
+    	setpgid(0,0);
+ 	
+	if(!IS_BACKGROUND)
+		tcsetpgrp(STDIN_FILENO, getpid());
     
-	setpgid(0,0);
- 	if(!IS_BACKGROUND)
-        tcsetpgrp(STDIN_FILENO, getpid());
-    
-    sigfillset(&set);
-    sigprocmask(SIG_UNBLOCK,&set,NULL);
-    
-    if((count = makeargv(cmdgrp, "|", cmdlist, MAX_CMD_LIST)) <= 0)
-        fatal("makeargv_cmdgrp error");
-    
-	for(i=0; i<count-1; i++)
-    {
+    	sigfillset(&set);
+    	sigprocmask(SIG_UNBLOCK,&set,NULL);
+    	if((count = makeargv(cmdgrp, "|", cmdlist, MAX_CMD_LIST)) <= 0) fatal("makeargv_cmdgrp error");
+
+    	for(i=0; i<count-1; i++)
+    	{
 		pipe(pfd);
-		switch(fork())
-		{
-			case -1: fatal("fork error");
-            case  0: close(pfd[0]);
-                dup2(pfd[1], STDOUT_FILENO);
-                execute_cmd(cmdlist[i]);
-            default: close(pfd[1]);
-                dup2(pfd[0], STDIN_FILENO);
+		switch(fork()) {
+		
+		case -1: fatal("fork error");
+	 
+            	case  0: close(pfd[0]);
+			 dup2(pfd[1], STDOUT_FILENO);
+			 execute_cmd(cmdlist[i]);
+
+		default: close(pfd[1]);
+			 dup2(pfd[0], STDIN_FILENO);
 		}
 	}
 	execute_cmd(cmdlist[i]);
-    
 }
 
 void execute_cmdline(char* cmdline)
@@ -246,10 +245,11 @@ void execute_cmdline(char* cmdline)
         memcpy(cmdgrptemp, cmdgrp[i], strlen(cmdgrp[i]) + 1);
         numtokens = makeargv(cmdgrp[i], " \t", cmdvector, MAX_CMD_GRP);
         
-        for( j = 0; j < sizeof( builtin_cmds ) / sizeof( COMMAND ); j++ ){            if( strcmp( builtin_cmds[j].name, cmdvector[0] ) == 0 ){
-                builtin_cmds[j].func( numtokens , cmdvector );
-                return;
-            }
+        for( j = 0; j < sizeof( builtin_cmds ) / sizeof( COMMAND ); j++ ){           
+		if( strcmp( builtin_cmds[j].name, cmdvector[0] ) == 0 ){
+                	builtin_cmds[j].func( numtokens , cmdvector );
+                	return;
+            	}
         }
         
 		IS_BACKGROUND = parse_background(cmdgrptemp);
