@@ -1,3 +1,6 @@
+#ifndef _SSU_SHELL_
+#define _SSU_SHELL_
+
 //headers
 
 #include <stdio.h>
@@ -24,3 +27,6 @@ char **tokenize(char *line);
 char **merge_to_command(char **tokens);
 void execute_commands(char **commands, int commandNo);
 void execute_command(char *command);
+
+
+#endif
