@@ -26,13 +26,13 @@ int main (int argc, char* argv[])
 		commandNo = 0;
 		memset(line, 0, sizeof(line));
 
-		if(argc == 2) { // batch mode
-			if(fgets(line, sizeof(line), fp) == NULL) { // file reading finished
+		if(argc == 2) {
+			if(fgets(line, sizeof(line), fp) == NULL) {
 				break;	
 			}
 
 			line[strlen(line) - 1] = '\0';
-		} else { // interactive mode
+		} else {
 			printf("$ ");
 			scanf("%[^\n]", line);
 			getchar();
@@ -44,6 +44,14 @@ int main (int argc, char* argv[])
 		tokens = tokenize(line);
 
 		for (i = 0; tokens[i] != NULL; i++) {
+			if (!strcmp(tokens[i], "pps")) {
+				tokens[i] = realloc(tokens[i], 6);	
+				sprintf(tokens[i], "%s", "./pps");
+			}
+			else if (!strcmp(tokens[i], "ttop")) {
+				tokens[i] = realloc(tokens[i], 7);
+				sprintf(tokens[i], "%s", "./ttop");
+			}
 //			printf("found token %s (remove this debug output later)\n", tokens[i]);
 		}
 
