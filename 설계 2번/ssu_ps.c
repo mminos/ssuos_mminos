@@ -63,11 +63,12 @@ int check_option(char **argv)
 void scan_proc(void) 
 {
 	int count;
-	int fsize;
 	struct dirent **dirlist;
 	struct passwd userpwd;
 	struct stat status;
 	char path[PATHLEN];
+	char line[NAMELEN];
+	char tmp[NAMELEN];
 	proc_list pstat;
 
 	if ((count = scandir("/proc", &dirlist, scandir_filter, NULL)) < 0) {
@@ -96,9 +97,37 @@ void scan_proc(void)
 		userpwd = *getpwuid(status.st_uid);
 		strcpy(pstat.name, userpwd.pw_name);
 		
-		get_cmdline(dirlist[i]->d_name, pstat.cmdline);	
+		//cmdline 구하기
 
-		break;
+		memset(path, 0, PATHLEN);
+		memset(tmp, 0, PATHLEN);
+		memset(line, 0, NAMELEN);
+
+		sprintf(path, "%s/%s/%s", "/proc", dirlist[i]->d_name, "cmdline");
+		fp = fopen(path, "r");
+
+		fread(line, NAMELEN, 1, fp);
+		for (int i = 0; i < NAMELEN; i++) {
+			if (line[i] == 0) {
+				if (i == NAMELEN - 1)
+					break;
+				else if (line[i + 1] == 0)
+					break;
+				else
+					line[i] = ' ';
+			}
+		}
+
+		if (strlen(line) == 0) {
+			pstat.cmdline[0] = '[';
+			pstat.cmdline[strlen(pstat.cmdline) - 1] = ']';
+		}
+		else {
+			memset(pstat.cmdline, 0, NAMELEN);
+			strcpy(pstat.cmdline, line);
+		}
+		
+
 	}
 	
 	for (int i = 0; i < count; i++)
@@ -107,11 +136,6 @@ void scan_proc(void)
 
 }
 
-void get_cmdline(char *d_name, char *cmdline)
-{
-	
-
-}
 
 proc_list *create_node(proc_list stat)
 {
