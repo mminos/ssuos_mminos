@@ -13,7 +13,7 @@ int main (int argc, char* argv[])
 	if (argc == 2) {
 		fp = fopen(argv[1],"r");
 
-		if(fp < 0) {
+		if (fp == NULL) {
 			
 			printf("File doesn't exists.");
 			return -1;
@@ -22,6 +22,7 @@ int main (int argc, char* argv[])
 
 	while(1) {
 		int pipe_num = 0;
+		int status;
 		
 		commandNo = 0;
 		memset(line, 0, sizeof(line));
@@ -70,7 +71,11 @@ int main (int argc, char* argv[])
 			execute_commands(commands, commandNo);
 		} 
 		else {
-			wait(NULL);
+			wait(&status);
+			if (!WIFEXITED(status)) {
+				fprintf(stderr, "child process doesn't exit normally.. check process\n");
+				continue;
+			}
 		}
 
 		

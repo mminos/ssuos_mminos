@@ -23,6 +23,7 @@
 #define false 0
 #define PATHLEN 1024
 #define NAMELEN 512
+#define LINEMAX 512
 
 typedef struct proc_info {
 	int pid;			// /proc/pid/stat
@@ -42,12 +43,21 @@ typedef struct proc_info {
 //functions
 int check_option(char **argv);
 void scan_proc(void);
-void get_cmdline(char *d_name, char *cmdline);
 
-proc_list *create_node(proc_list stat);
+void print_ps(void);
+void print_default(void);
+void print_without_x(void);
+void print_without_a(void);
+void print_all(void);
+
+proc_list *create_node(proc_list *stat);
+void add_node(proc_list *node);
+void print_list(void);
+void free_list(proc_list *tmp);
 
 time_t get_boot_time(void);
 long get_total_memory(void);
+void get_tty(int tty_nr, char *tty);
 int scandir_filter(const struct dirent *file);
 int _isdigit(char *str);
 
