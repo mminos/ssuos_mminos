@@ -12,8 +12,8 @@ int main(int argc, char *argv[])
 {
 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &term);
 
-	printf("lines : %d\n", term.ws_row);
-	printf("columns %d\n", term.ws_col);
+//	printf("lines : %d\n", term.ws_row);
+//	printf("columns %d\n", term.ws_col);
 
 	if (argc > 2) {
 		fprintf(stderr, "usage : ./pps <option>\n");

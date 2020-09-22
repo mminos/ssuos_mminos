@@ -72,7 +72,7 @@ int main (int argc, char* argv[])
 		} 
 		else {
 			wait(&status);
-			if (!WIFEXITED(status)) {
+			if (!WIFEXITED(status) && tokens[0] != NULL) {
 				fprintf(stderr, "child process doesn't exit normally.. check process\n");
 				continue;
 			}
@@ -181,6 +181,6 @@ void execute_command(char *command)
 	command_tok = tokenize(command);
 	execvp(command_tok[0], command_tok);
 
-	fprintf(stderr, "SSUShell : incorrect command : %s\n", command);
+	fprintf(stderr, "SSUShell : incorrect command for %s\n", command);
 	exit(1);
 }
