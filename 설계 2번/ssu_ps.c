@@ -1,10 +1,11 @@
 #include "ssu_ps.h"
 
-struct winsize term; //터미널 크기
+struct winsize term; 	//터미널 크기
 proc_list *head;
 
-long mem_tot;	//총 메모리 kb
-time_t boot_time;		//오에스 부팅 타임
+long mem_tot;		//총 메모리 kb
+time_t boot_time;	//오에스 부팅 타임
+double uptime;
 int a_flag, u_flag, x_flag;
 
 int main(int argc, char *argv[]) 
@@ -31,6 +32,7 @@ int main(int argc, char *argv[])
 	scan_proc();
 	print_ps();
 
+	free_list(head);
 	exit(0);
 }
 
@@ -89,14 +91,17 @@ void scan_proc(void)
 		memset(&pstat, 0, sizeof(proc_list));
 
 		//stat파일에서 정보 읽어오기
-		fscanf(fp, "%d %s %c %d %*d %*d %d %*d %*u %*u %*u %*u %*u %lu %lu"
-				"%*d %*d %*d %*d %*d %*d %llu %lu %ld",
-				&pstat.pid, pstat.cmdline, &pstat.state, &pstat.ppid, 
-				&pstat.tty_nr, &pstat.utime, &pstat.stime, &pstat.starttime, 
+		fscanf(fp, "%d %s %c %d %d %d %d %d %*u %*u %*u %*u %*u %lu %lu"
+				"%*d %*d %*d %ld %ld %*d %llu %lu %ld",
+				&pstat.pid, pstat.cmdline, &pstat.state, &pstat.ppid, &pstat.pgrp,
+				&pstat.sid, &pstat.tty_nr, &pstat.tpgid, &pstat.utime, &pstat.stime, 
+				&pstat.nice, &pstat.num_threads, &pstat.starttime, 
 				&pstat.vsize, &pstat.rss);
 		fclose(fp);
 		
 		//uid에서 사용자 이름 구하기
+		memset(path, 0, PATHLEN);
+		sprintf(path, "%s/%s", "/proc", dirlist[i]->d_name);
 		stat(path, &status);
 		userpwd = *getpwuid(status.st_uid);
 		strcpy(pstat.name, userpwd.pw_name);
@@ -167,18 +172,23 @@ void print_default(void)
 	int bash_tty = -1;
 	char bash_name[64];
 	char headline[LINEMAX];
+	char tmp_line[LINEMAX];
 	char line[LINEMAX];
 	char tty[8];
+	struct tm t;
+	time_t runtime;
 
 	memset(headline, 0, LINEMAX);
-	sprintf(headline, "%6s %7s %8s %s", "PID", "TTY", "TIME", "CMD");
-	printf("%-*s\n", term.ws_col, headline);
+	memset(line, 0, LINEMAX);
+	sprintf(headline, "%6s %-7s %8s %s", "PID", "TTY", "TIME", "CMD");
+	strncpy(line, headline, term.ws_col);
+	printf("%s\n", line);
 
 	while (tmp != NULL) {
-		if (tmp.pid == bash_pid) {
+		if (tmp->pid == bash_pid) {
 			memset(bash_name, 0, 64);
-			strcpy(bash_name, tmp.name);
-			bash_tty = tmp.tty_nr;
+			strcpy(bash_name, tmp->name);
+			bash_tty = tmp->tty_nr;
 		}
 		
 		tmp = tmp->next;
@@ -188,24 +198,287 @@ void print_default(void)
 	
 	tmp = head->next;
 	while (tmp != NULL) {
-		if (tmp.tty_nr == bash_tty && !strcmp(tmp.name, bash_name)) {
-			memset(line, 0, LINEMAX);
+		if (tmp->tty_nr == bash_tty && !strcmp(tmp->name, bash_name)) {
+			runtime = tmp->stime + tmp->utime;
+			runtime /= sysconf(_SC_CLK_TCK);
+			t = *gmtime(&runtime);
 			
+			memset(line, 0, LINEMAX);
+			memset(tmp_line, 0, LINEMAX);
+			sprintf(tmp_line, "%6d %-7s %02d:%02d:%02d ", tmp->pid, tty,
+					t.tm_hour, t.tm_min, t.tm_sec);
+			strcat(tmp_line, tmp->cmdline);
+			strncpy(line, tmp_line, term.ws_col);
+			printf("%s\n", line);
+		}
+
+		tmp = tmp->next;
+	}
 }
 
 void print_without_x(void)
 {
+	proc_list *tmp = head->next;
+	int bash_pid = getppid();
+	char bash_name[64];
+	char headline[LINEMAX];
+	char tmp_line[LINEMAX];
+	char line[LINEMAX];
+	char tty[8];
+	char state[6];
+	double cpu_per, mem_per;
+	struct tm t, t2;
+	time_t runtime;
+	time_t starttime;
 
+	while (tmp != NULL) {
+		if (tmp->pid == bash_pid) {
+			memset(bash_name, 0, 64);
+			strcpy(bash_name, tmp->name);
+		}
+		
+		tmp = tmp->next;
+	}
+
+	tmp = head->next;
+
+	if (u_flag) {
+		memset(line, 0, LINEMAX);
+		memset(headline, 0, LINEMAX);
+		sprintf(headline, "%-9s %6s %4s %4s %7s %7s %-7s %-5s %5s %5s %s",
+				"USER", "PID", "%CPU", "%MEM", "VSZ", "RSS", "TTY", 
+				"STAT", "START", "TIME", "COMMAND");
+		strncpy(line, headline, term.ws_col);
+		printf("%s\n", line);
+
+		while (tmp != NULL) {
+			get_tty(tmp->tty_nr, tty);
+
+			if (strcmp(tty, "?") && !strcmp(tmp->name, bash_name)) {
+				uptime = get_uptime();
+				runtime = tmp->stime + tmp->utime;
+				runtime /= sysconf(_SC_CLK_TCK);
+				
+				t = *gmtime(&runtime);
+				cpu_per = runtime / uptime * 100;
+				mem_per = (double)tmp->rss * 4 / mem_tot * 100;
+				starttime = tmp->starttime / sysconf(_SC_CLK_TCK) + boot_time;
+				t2 = *localtime(&starttime);
+				get_state(tmp, state);
+
+				memset(line, 0, LINEMAX);
+				memset(tmp_line, 0, LINEMAX);
+				sprintf(tmp_line, "%-9s %6d %4.1lf %4.1lf %7lu %7ld "
+						"%-7s %-5s %02d:%02d %02d:%02d ",
+						tmp->name, tmp->pid, cpu_per, mem_per, tmp->vsize / 1024,
+						tmp->rss * 4, tty, state, t2.tm_hour, t2.tm_min,
+						t.tm_min, t.tm_sec);
+				strcat(tmp_line, tmp->cmdline);
+				strncpy(line, tmp_line, term.ws_col);
+				printf("%s\n", line);
+			}
+			
+			tmp = tmp->next;
+		}		
+	}
+	else {
+		memset(line, 0, LINEMAX);
+		memset(headline, 0, LINEMAX);
+		sprintf(headline, "%6s %-7s %-5s %5s %s", "PID", "TTY", "STAT", "TIME", "CMD");
+		strncpy(line, headline, term.ws_col);
+		printf("%s\n", line);
+
+		while (tmp != NULL) {
+			get_tty(tmp->tty_nr, tty);
+
+			if (strcmp(tty, "?") && !strcmp(tmp->name, bash_name)) {
+				runtime = tmp->stime + tmp->utime;
+				runtime /= sysconf(_SC_CLK_TCK);
+				t = *gmtime(&runtime);
+				get_state(tmp, state);
+
+				memset(line, 0, LINEMAX);
+				memset(tmp_line, 0, LINEMAX);
+				sprintf(tmp_line, "%6d %-7s %-5s %02d:%02d ", tmp->pid, tty,
+						state, t.tm_min, t.tm_sec);
+				strcat(tmp_line, tmp->cmdline);
+				strncpy(line, tmp_line, term.ws_col);
+				printf("%s\n", line);
+			}
+
+			tmp = tmp->next;
+		}
+	}
 }
 
 void print_without_a(void)
 {
+	proc_list *tmp = head->next;
+	int bash_pid = getppid();
+	char bash_name[64];
+	char headline[LINEMAX];
+	char tmp_line[LINEMAX];
+	char line[LINEMAX];
+	char tty[8];
+	char state[6];
+	double cpu_per, mem_per;
+	struct tm t, t2;
+	time_t runtime, starttime;
+
+	while (tmp != NULL) {
+		if (tmp->pid == bash_pid) {
+			memset(bash_name, 0, 64);
+			strcpy(bash_name, tmp->name);
+		}
+		
+		tmp = tmp->next;
+	}
+	
+	tmp = head->next;
+
+	if (u_flag) {
+		memset(line, 0, LINEMAX);
+		memset(headline, 0, LINEMAX);
+		sprintf(headline, "%-9s %6s %4s %4s %7s %7s %-7s %-5s %5s %5s %s",
+				"USER", "PID", "%CPU", "%MEM", "VSZ", "RSS", "TTY", 
+				"STAT", "START", "TIME", "COMMAND");
+		strncpy(line, headline, term.ws_col);
+		printf("%s\n", line);
+
+		while (tmp != NULL) {
+			if (!strcmp(tmp->name, bash_name)) {
+				get_tty(tmp->tty_nr, tty);
+				uptime = get_uptime();
+				runtime = tmp->stime + tmp->utime;
+				runtime /= sysconf(_SC_CLK_TCK);
+
+				t = *gmtime(&runtime);
+				cpu_per = runtime / uptime * 100;
+				mem_per = (double)tmp->rss * 4 / mem_tot * 100;
+				starttime = tmp->starttime / sysconf(_SC_CLK_TCK) + boot_time;
+				t2 = *localtime(&starttime);
+				get_state(tmp, state);
+
+				memset(line, 0, LINEMAX);
+				memset(tmp_line, 0, LINEMAX);
+				sprintf(tmp_line, "%-9s %6d %4.1lf %4.1lf %7lu %7ld "
+						"%-7s %-5s %02d:%02d %02d:%02d ",
+						tmp->name, tmp->pid, cpu_per, mem_per, tmp->vsize / 1024,
+						tmp->rss * 4, tty, state, t2.tm_hour, t2.tm_min,
+						t.tm_min, t.tm_sec);
+				strcat(tmp_line, tmp->cmdline);
+				strncpy(line, tmp_line, term.ws_col);
+				printf("%s\n", line);
+			}
+			
+			tmp = tmp->next;
+		}
+	}
+	else {
+		memset(line, 0, LINEMAX);
+		memset(headline, 0, LINEMAX);
+		sprintf(headline, "%6s %-7s %-5s %5s %s", "PID", "TTY", "STAT", "TIME", "CMD");
+		strncpy(line, headline, term.ws_col);
+		printf("%s\n", line);
+
+		while (tmp != NULL) {
+			if (!strcmp(tmp->name, bash_name)) {
+				get_tty(tmp->tty_nr, tty);
+				runtime = tmp->stime + tmp->utime;
+				runtime /= sysconf(_SC_CLK_TCK);
+				t = *gmtime(&runtime);
+				get_state(tmp, state);
+
+				memset(line, 0, LINEMAX);
+				memset(tmp_line, 0, LINEMAX);
+				sprintf(tmp_line, "%6d %-7s %-5s %02d:%02d ", tmp->pid, tty,
+						state, t.tm_min, t.tm_sec);
+				strcat(tmp_line, tmp->cmdline);
+				strncpy(line, tmp_line, term.ws_col);
+				printf("%s\n", line);
+			}
+
+			tmp = tmp->next;
+		}
+	}
+
 
 }
 
 void print_all(void)
 {
+	proc_list *tmp = head->next;
+	char headline[LINEMAX];
+	char tmp_line[LINEMAX];
+	char line[LINEMAX];
+	char tty[8];
+	char state[6];
+	double cpu_per, mem_per;
+	struct tm t, t2;
+	time_t runtime, starttime;
+	
+	if (u_flag) {
+		memset(line, 0, LINEMAX);
+		memset(headline, 0, LINEMAX);
+		sprintf(headline, "%-9s %6s %4s %4s %7s %7s %-7s %-5s %5s %5s %s",
+				"USER", "PID", "%CPU", "%MEM", "VSZ", "RSS", "TTY",
+				"STAT", "START", "TIME", "COMMAND");
+		strncpy(line, headline, term.ws_col);
+		printf("%s\n", line);
 
+		while (tmp != NULL) {
+			get_tty(tmp->tty_nr, tty);
+			uptime = get_uptime();
+			runtime = tmp->stime + tmp->utime;
+			runtime /= sysconf(_SC_CLK_TCK);
+
+			t = *gmtime(&runtime);
+			cpu_per = runtime / uptime * 100;
+			mem_per = (double)tmp->rss * 4 / mem_tot * 100;
+			starttime = tmp->starttime / sysconf(_SC_CLK_TCK) + boot_time;
+			t2 = *localtime(&starttime);
+			get_state(tmp, state);
+
+			memset(line, 0, LINEMAX);
+			memset(tmp_line, 0, LINEMAX);
+			sprintf(tmp_line, "%-9s %6d %4.1lf %4.1lf %7lu %7ld "
+					"%-7s %-5s %02d:%02d %02d:%02d ",
+					tmp->name, tmp->pid, cpu_per, mem_per, tmp->vsize / 1024,
+					tmp->rss * 4, tty, state, t2.tm_hour, t2.tm_min,
+					t.tm_min, t.tm_sec);
+			strcat(tmp_line, tmp->cmdline);
+			strncpy(line, tmp_line, term.ws_col);
+			printf("%s\n", line);
+
+			tmp = tmp->next;
+		}
+	}
+	else {
+		memset(line, 0, LINEMAX);
+		memset(headline, 0, LINEMAX);
+		sprintf(headline, "%6s %-7s %-5s %5s %s", "PID", "TTY", "STAT", "TIME", "CMD");
+		strncpy(line, headline, term.ws_col);
+		printf("%s\n", line);
+
+		while (tmp != NULL) {
+			get_tty(tmp->tty_nr, tty);
+
+			runtime = tmp->stime + tmp->utime;
+			runtime /= sysconf(_SC_CLK_TCK);
+			t = *gmtime(&runtime);
+			get_state(tmp, state);
+
+			memset(line, 0, LINEMAX);
+			memset(tmp_line, 0, LINEMAX);
+			sprintf(tmp_line, "%6d %-7s %-5s %02d:%02d ", tmp->pid, tty,
+					state, t.tm_min, t.tm_sec);
+			strcat(tmp_line, tmp->cmdline);
+			strncpy(line, tmp_line, term.ws_col);
+			printf("%s\n", line);
+
+			tmp = tmp->next;
+		}
+	}
 }
 
 
@@ -271,12 +544,22 @@ time_t get_boot_time()
 	return res;
 }
 
-long get_total_memory()
+long get_total_memory(void)
 {
 	FILE *fp = fopen("/proc/meminfo", "r");
 	long res;
 
 	fscanf(fp, "%*s %ld", &res);
+	fclose(fp);
+	return res;
+}
+
+double get_uptime(void)
+{
+	FILE *fp = fopen("/proc/uptime", "r");
+	double res;
+
+	fscanf(fp, "%lf", &res);
 	fclose(fp);
 	return res;
 }
@@ -301,6 +584,27 @@ void get_tty(int tty_nr, char *tty)
 	}
 	else
 		sprintf(tty, "%s", "?");
+}
+
+void get_state(proc_list *tmp, char *state)	// L state(check locked page)의 경우 smaps에서 확인할 수 있다는
+{						// 것 까지는 확인하였으나 확인하려면 CONFIG_PROC_PAGE_MONITOR를
+	int idx = 0;				// enable 시켜야 된다는데, 방법을 모르겠어서 구현을 못했습니다..
+	memset(state, 0, 6);
+	state[idx++] = tmp->state;
+	
+	if (tmp->nice < -4)		//priority low, high 기준을 정확히 못찾겠어서 임의로 정했습니다.
+		state[idx++] = '<';	//5 이상 low, -5 이하 high로 나타나는걸로 보였습니다 (제 pc 기준)
+	else if (tmp->nice > 4)
+		state[idx++] = 'N';
+
+	if (tmp->pid == tmp->sid)
+		state[idx++] = 's';
+
+	if (tmp->num_threads > 1)
+		state[idx++] = 'l';
+
+	if (tmp->pgrp == tmp->tpgid)
+		state[idx++] = '+';
 }
 
 int scandir_filter(const struct dirent *file) 

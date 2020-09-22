@@ -28,13 +28,14 @@
 typedef struct proc_info {
 	int pid;			// /proc/pid/stat
 	int ppid;			// /porc/pid/stat
+	int pgrp, sid, tpgid;		// /proc/pid/stat
 	int tty_nr;			// /proc/pid/stat
 	char state;			// /proc/pid/stat
 	char cmdline[NAMELEN];		// /porc/pid/cmdline
 	char name[64];			// getpwuid..
 	unsigned long utime, stime;	// /proc/pid/stat
 	unsigned long vsize;		// /proc/pid/stat
-	long rss;			// /proc/pid/stat
+	long rss, nice, num_threads;	// /proc/pid/stat
 	unsigned long long starttime;	// /proc/pid/stat
 
 	struct proc_info *next;
@@ -57,7 +58,9 @@ void free_list(proc_list *tmp);
 
 time_t get_boot_time(void);
 long get_total_memory(void);
+double get_uptime(void);
 void get_tty(int tty_nr, char *tty);
+void get_state(proc_list *tmp, char *state);
 int scandir_filter(const struct dirent *file);
 int _isdigit(char *str);
 
