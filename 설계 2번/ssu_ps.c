@@ -10,7 +10,7 @@ int a_flag, u_flag, x_flag;
 
 int main(int argc, char *argv[]) 
 {
-	ioctl(STDOUT_FILENO, TIOCGWINSZ, &term);
+	ioctl(STDERR_FILENO, TIOCGWINSZ, &term);
 
 //	printf("lines : %d\n", term.ws_row);
 //	printf("columns %d\n", term.ws_col);
