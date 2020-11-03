@@ -11,6 +11,7 @@
 void SSU_Sem_init(SSU_Sem *s, int value) {
 	s->key = value;
 	s->head = NULL;
+        s->wait_lock = 0;
 }
 
 void SSU_Sem_down(SSU_Sem *s) {
@@ -33,18 +34,17 @@ void SSU_Sem_down(SSU_Sem *s) {
 
 		while (1) {
 			if (s->key > 0) {
-				if (s->head == NULL || s->head->status == &status) {
+				if (s->wait_lock == 0 && s->head->status == &status) {
+                                        s->wait_lock = 1;
 
 					s->key--;
-					if (s->head != NULL) {
-						tmp = s->head;
-						s->head = s->head->next;
-						free(tmp);
-					}
+                                        tmp = s->head;
+					s->head = s->head->next;
+					free(tmp);
 
+                                        s->wait_lock = 0;
 					break;
 				}
-				usleep(1000);
 			}
 		}
 	}

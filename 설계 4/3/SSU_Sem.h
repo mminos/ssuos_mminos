@@ -8,6 +8,7 @@ typedef struct wait_q {
 typedef struct SSU_Sem {
 	int key;
 	wait_q *head;
+        int wait_lock;
 } SSU_Sem;
 
 void SSU_Sem_init(SSU_Sem *, int);

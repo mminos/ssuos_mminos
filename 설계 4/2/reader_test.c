@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
 	threads = (pthread_t*) malloc(num_threads * (sizeof(pthread_t)));
 
 	int count = 0;
-	for (int i=0; i<read_num_threads; i++)
+	for(int i=0; i<read_num_threads; i++)
 	{
 		int *arg = (int *)malloc((sizeof(int)));
 		if (arg == NULL){
@@ -96,13 +96,13 @@ int main(int argc, char *argv[])
 		*arg = i;
 		int ret = pthread_create(threads+count, NULL, Reader, (void*) arg);
 		if(ret){
-			printf("Error - pthread_create() return code: %d\n",ret);
-			exit(EXIT_FAILURE);
-		}
+        printf("Error - pthread_create() return code: %d\n",ret);
+        exit(EXIT_FAILURE);
+    }
 		count++;
 	}
 
-	for (int i=0; i<write_num_threads; i++)
+	for(int i=0;i<write_num_threads;i++)
 	{
 		int *arg = (int *)malloc((sizeof(int)));
 		if (arg == NULL){
@@ -111,14 +111,15 @@ int main(int argc, char *argv[])
 		}
 		*arg = i;
 		int ret = pthread_create(threads+count, NULL, Writer,( void*) arg);
-		if(ret) {
-			printf("Error - pthread_create() return code: %d\n",ret);
-        		exit(EXIT_FAILURE);
-    		}
+		if(ret)
+    {
+        printf("Error - pthread_create() return code: %d\n",ret);
+        exit(EXIT_FAILURE);
+    }
 		count++;
 	}
 
-	for (int i=0; i<read_num_threads; i++)
+	for(int i=0;i<read_num_threads;i++)
 	{
 		int *arg = (int *)malloc((sizeof(int)));
 		if (arg == NULL)
@@ -128,10 +129,11 @@ int main(int argc, char *argv[])
 		}
 		*arg = read_num_threads + i;
 		int ret = pthread_create(threads+count,NULL,Reader,(void*) arg);
-		if(ret) {
-        		printf("Error - pthread_create() return code: %d\n",ret);
-        		exit(EXIT_FAILURE);
-    		}
+		if(ret)
+    {
+        printf("Error - pthread_create() return code: %d\n",ret);
+        exit(EXIT_FAILURE);
+    }
 		count++;
 	}
 

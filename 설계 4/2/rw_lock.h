@@ -6,8 +6,9 @@
 struct rw_lock
 {
 	pthread_rwlock_t lock;
-	int r_num;
+        pthread_spinlock_t busy;
 	int w_request;
+        int r_flag;
 };
 
 void init_rwlock(struct rw_lock * rw);
