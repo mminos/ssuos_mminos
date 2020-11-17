@@ -31,6 +31,7 @@ void w_lock(struct rw_lock * rw)
         pthread_spin_lock(&rw->busy);
 	rw->w_request++;
         pthread_spin_unlock(&rw->busy);
+	
 	pthread_rwlock_wrlock(&rw->lock);
 
         pthread_spin_lock(&rw->busy);

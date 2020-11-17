@@ -11,15 +11,19 @@
 void SSU_Sem_init(SSU_Sem *s, int value) {
 	s->key = value;
 	s->head = NULL;
-        s->wait_lock = 0;
+	s->wait_lock = 0;
+       	pthread_mutex_init(&s->lock, 0);
 }
+
 
 void SSU_Sem_down(SSU_Sem *s) {
 	int status = 1;
 	wait_q *thread;
-	wait_q *tmp = s->head;
+	wait_q *tmp;
 
+	pthread_mutex_lock(&s->lock);
 	if (s->key <= 0) {
+		tmp = s->head;
 		thread = (wait_q *)malloc(sizeof(wait_q));
 		thread->status = &status;
 		thread->next = NULL;
@@ -31,7 +35,8 @@ void SSU_Sem_down(SSU_Sem *s) {
 				tmp = tmp->next;
 			tmp->next = thread;
 		}
-
+		pthread_mutex_unlock(&s->lock);
+		
 		while (1) {
 			if (s->key > 0) {
 				if (s->wait_lock == 0 && s->head->status == &status) {
@@ -50,6 +55,7 @@ void SSU_Sem_down(SSU_Sem *s) {
 	}
 	else {
 		s->key--;
+		pthread_mutex_unlock(&s->lock);
 	}
 }
 
